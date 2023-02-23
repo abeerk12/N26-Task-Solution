@@ -1,0 +1,22 @@
+--Creating table by self joining to get all records with 7 day - transactions gap. and rolling it up to get counts
+
+drop table if exists transactions_rolled_up;
+create transactions_rolled_up as
+  (select trans_1 as transaction_id, user_id, date_1 as date, count(distinct trans_2) as no_txn_last_7days from
+    (select a.transaction_id as trans_1, a.user_id, b.transaction_id as trans_2, a.date as date_1, b.date as date_2
+    from transactions as a join transactions as b 
+    on a.user_id = b.user_id
+    and date_diff(date (a.date),date (b.date),day) <=7
+    and date_diff(date (a.date),date (b.date),day) >0
+    order by user_id)m
+  group by 1,2,3
+  order by user_id,date);
+
+--Joining rolled up data with original transactions data to get all days results
+
+select a.transaction_id, a.user_id, a.date, ifnull(b.no_txn_last_7days,0) as no_txn_last_7days from
+transactions as a left join transactions_rolled_up as b
+on a.transaction_id = b.transaction_id and
+a.user_id = b.user_id and
+a.date = b.date
+order by user_id, date;
